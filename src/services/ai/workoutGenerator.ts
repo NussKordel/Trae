@@ -799,7 +799,11 @@ Structure:
 
   private aggressiveJsonClean(content: string): string {
     // More aggressive cleaning for malformed JSON
-    let cleaned = content;
+    let cleaned = content.trim();
+    
+    // Remove markdown code blocks if present
+    cleaned = cleaned.replace(/```json\s*/g, '').replace(/```\s*$/g, '');
+    cleaned = cleaned.replace(/```[a-zA-Z]*\s*/g, '').replace(/```\s*$/g, '');
     
     // Remove any non-JSON content at the beginning
     const jsonStart = cleaned.search(/\{/);
@@ -826,10 +830,40 @@ Structure:
       cleaned = cleaned.substring(0, lastValidIndex + 1);
     }
     
-    // Fix common JSON issues
-    cleaned = this.attemptJsonFix(cleaned);
+    // Fix common array issues that cause parsing errors
+    // Fix trailing commas in arrays
+    cleaned = cleaned.replace(/,\s*]/g, ']');
+    // Fix trailing commas in objects
+    cleaned = cleaned.replace(/,\s*}/g, '}');
+    // Fix double commas
+    cleaned = cleaned.replace(/,,+/g, ',');
+    // Fix missing commas between array elements (common AI mistake)
+    cleaned = cleaned.replace(/}\s*{/g, '},{');
+    cleaned = cleaned.replace(/]\s*\[/g, '],[');
+    // Fix missing commas between object properties
+    cleaned = cleaned.replace(/"\s*"([^:]*?)":/g, '","$1":');
+    // Fix incomplete strings at the end
+    cleaned = cleaned.replace(/"[^"]*$/g, '"');
     
-    return cleaned;
+    // Handle potential truncation by ensuring proper structure
+    // If the JSON seems truncated, try to close it properly
+    const openBraces = (cleaned.match(/{/g) || []).length;
+    const closeBraces = (cleaned.match(/}/g) || []).length;
+    const openBrackets = (cleaned.match(/\[/g) || []).length;
+    const closeBrackets = (cleaned.match(/]/g) || []).length;
+    
+    // Add missing closing braces
+    for (let i = 0; i < openBraces - closeBraces; i++) {
+      cleaned += '}';
+    }
+    
+    // Add missing closing brackets
+    for (let i = 0; i < openBrackets - closeBrackets; i++) {
+      cleaned += ']';
+    }
+    
+    // Apply additional JSON fixes
+    return this.attemptJsonFix(cleaned);
   }
 
   private attemptJsonFix(jsonString: string): string {
@@ -893,13 +927,23 @@ Structure:
       try {
         parsed = JSON.parse(jsonString);
       } catch (jsonError) {
-        // Provide more specific JSON parsing error information
-        const errorMessage = jsonError instanceof Error ? jsonError.message : 'Unknown JSON error';
-        const position = this.extractPositionFromError(errorMessage);
-        console.error('Enhanced JSON parsing failed:', errorMessage);
-        console.error('Error position:', position);
-        console.error('JSON around error position:', jsonString.substring(Math.max(0, position - 100), position + 100));
-        throw new Error(`Enhanced JSON parsing failed at position ${position}: ${errorMessage}`);
+        // Try aggressive cleaning as a last resort
+        console.log('Initial JSON parsing failed, attempting aggressive cleaning...');
+        try {
+          const aggressivelyCleaned = this.aggressiveJsonClean(content);
+          parsed = JSON.parse(aggressivelyCleaned);
+          console.log('Aggressive cleaning succeeded!');
+        } catch (secondError) {
+          // Provide detailed error information for debugging
+          const errorMessage = jsonError instanceof Error ? jsonError.message : 'Unknown JSON error';
+          const position = this.extractPositionFromError(errorMessage);
+          console.error('Enhanced JSON parsing failed after all attempts:', errorMessage);
+          console.error('Error position:', position);
+          console.error('JSON around error position:', jsonString.substring(Math.max(0, position - 100), position + 100));
+          console.error('Original content length:', content.length);
+          console.error('Cleaned JSON length:', jsonString.length);
+          throw new Error(`Enhanced JSON parsing failed at position ${position}: ${errorMessage}`);
+        }
       }
       
       // Ensure the response has the correct structure
