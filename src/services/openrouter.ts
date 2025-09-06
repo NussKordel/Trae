@@ -25,9 +25,9 @@ export class OpenRouterService {
     this.apiKey = apiKey || this.getStoredApiKey();
     this.baseURL = OPENROUTER_API_URL;
     
-    // Don't throw error if no API key - allow fallback mechanisms
+    // Validate API key is configured
     if (!this.apiKey) {
-      console.warn('OpenRouter API key not configured. Workout generation will use fallback responses.');
+      throw new Error('OpenRouter API key is required but not configured.');
     }
   }
 
@@ -52,8 +52,11 @@ export class OpenRouterService {
   private selectModel(modelType: AIModelType): string {
     const models = AI_MODELS[modelType];
     if (!models || models.length === 0) {
-      // Fallback to default model
-      return DEFAULT_MODELS[modelType]?.id || 'openai/gpt-3.5-turbo';
+      const defaultModel = DEFAULT_MODELS[modelType];
+      if (!defaultModel) {
+        throw new Error(`No models available for model type: ${modelType}`);
+      }
+      return defaultModel.id;
     }
     return models[0].id;
   }
@@ -121,15 +124,14 @@ export class OpenRouterService {
     throw lastError!;
   }
 
-  async generateResponse(request: OpenRouterRequest, options: AIRequestOptions = {}): Promise<OpenRouterResponse | null> {
+  async generateResponse(request: OpenRouterRequest, options: AIRequestOptions = {}): Promise<OpenRouterResponse> {
     // Check if API key is configured and valid
     if (!this.hasApiKey() || 
         this.apiKey === 'your_openrouter_api_key_here' || 
         this.apiKey.trim() === '' || 
         this.apiKey === 'undefined' || 
         this.apiKey === 'null') {
-      console.warn('OpenRouter API key not configured or is placeholder. Returning null for fallback handling.');
-      return null;
+      throw new Error('OpenRouter API key is not configured or invalid. Please set a valid API key to use AI features.');
     }
     
     try {
@@ -156,7 +158,7 @@ export class OpenRouterService {
         messageCount: request.messages?.length || 0
       }, { log: false }); // Don't log again, just notify
       
-      return null;
+      throw error;
     }
   }
 
@@ -164,28 +166,18 @@ export class OpenRouterService {
     modelType: AIModelType,
     messages: OpenRouterMessage[],
     options: AIRequestOptions = {}
-  ): Promise<OpenRouterResponse | null> {
-    try {
-      const model = this.selectModel(modelType);
-      
-      const request: OpenRouterRequest = {
-        model,
-        messages,
-        max_tokens: options.maxTokens || 2000,
-        temperature: options.temperature || 0.7,
-        top_p: options.topP || 0.9,
-      };
-      
-      return await this.generateResponse(request, options);
-    } catch (error) {
-      handleAIError(error, {
-        operation: 'generateWorkout',
-        modelType,
-        messageCount: messages.length
-      });
-      
-      return null;
-    }
+  ): Promise<OpenRouterResponse> {
+    const model = this.selectModel(modelType);
+    
+    const request: OpenRouterRequest = {
+      model,
+      messages,
+      max_tokens: options.maxTokens || 2000,
+      temperature: options.temperature || 0.7,
+      top_p: options.topP || 0.9,
+    };
+    
+    return await this.generateResponse(request, options);
   }
 
   async testConnection(): Promise<boolean> {
@@ -247,7 +239,7 @@ export class OpenRouterService {
         operation: 'getAvailableModels'
       }, { notify: false });
       
-      return null;
+      throw error;
     }
   }
 
@@ -267,7 +259,7 @@ export class OpenRouterService {
         modelId
       }, { notify: false });
       
-      return null;
+      throw error;
     }
   }
 

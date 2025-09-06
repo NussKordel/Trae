@@ -81,7 +81,7 @@ export interface AIRequestOptions {
   retryAttempts?: number;
   retries?: number;
   timeout?: number;
-  fallbackModels?: boolean;
+
 }
 
 export interface AIResponse {

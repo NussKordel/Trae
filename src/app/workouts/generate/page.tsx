@@ -210,15 +210,7 @@ export default function WorkoutGeneration() {
     setError(null)
     
     try {
-      // Check if API key is configured
-      const apiKey = process.env.NEXT_PUBLIC_OPENROUTER_API_KEY || localStorage.getItem('openrouter_api_key')
-      console.log('API Key check:', { apiKey, isPlaceholder: apiKey === 'your_openrouter_api_key_here' })
-      
-      if (!apiKey || apiKey === 'your_openrouter_api_key_here') {
-        throw new Error('API key not configured. Please configure your OpenRouter API key in settings to generate workouts.')
-      }
-      
-      // Real API call using WorkoutGeneratorService
+      // Use WorkoutGeneratorService (API key validation handled by service)
       const workoutGenerator = getWorkoutGeneratorService()
       
       // Convert parameters to WorkoutGenerationRequest format

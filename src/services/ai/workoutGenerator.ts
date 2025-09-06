@@ -604,8 +604,11 @@ Structure:
   private selectModel(modelType: AIModelType): string {
     const models = AI_MODELS[modelType];
     if (!models || models.length === 0) {
-      // Fallback to default model
-      return DEFAULT_MODELS[modelType]?.id || 'openai/gpt-3.5-turbo';
+      const defaultModel = DEFAULT_MODELS[modelType];
+      if (!defaultModel) {
+        throw new Error(`No models available for model type: ${modelType}`);
+      }
+      return defaultModel.id;
     }
     return models[0].id;
   }
@@ -760,8 +763,7 @@ Structure:
       console.error('Failed to parse workout response:', error);
       console.error('Raw content:', content);
       
-      // Return a fallback workout
-      return this.createFallbackWorkout(modelUsed);
+      throw new Error(`Failed to parse AI workout response: ${error instanceof Error ? error.message : 'Unknown error'}`);
     }
   }
 
@@ -888,119 +890,11 @@ Structure:
       console.error('Failed to parse enhanced workout response:', error);
       console.error('Raw content:', content);
       
-      // Return enhanced fallback workout
-      const fallbackWorkout = this.createFallbackWorkout(modelUsed);
-      const safetyAnalysis = {
-        riskLevel: 'low' as const,
-        contraindications: [],
-        modifications: ['Reduce intensity if experiencing any discomfort']
-      };
-      
-      const enhancedFallback = this.convertToEnhancedResponse(fallbackWorkout, safetyAnalysis);
-      enhancedFallback.workout.warnings = ['This is a fallback workout - consult a fitness professional for personalized guidance'];
-      
-      return enhancedFallback;
+      throw new Error(`Failed to parse AI enhanced workout response: ${error instanceof Error ? error.message : 'Unknown error'}`);
     }
   }
 
-  private createFallbackWorkout(modelUsed: string): WorkoutGenerationResponse {
-    return {
-      workout: {
-        title: 'Basic Bodyweight Workout',
-        description: 'A simple, effective bodyweight routine for all fitness levels',
-        duration: 30,
-        difficulty: 'medium',
-        exercises: [
-          {
-            name: 'Push-ups',
-            description: 'Classic upper body exercise targeting chest, shoulders, and triceps',
-            sets: 3,
-            reps: 10,
-            restTime: 60,
-            difficulty: 'medium',
-            equipment: ['bodyweight'],
-            muscleGroups: ['chest', 'shoulders', 'triceps'],
-            instructions: [
-              'Start in plank position with hands shoulder-width apart',
-              'Lower your body until chest nearly touches the floor',
-              'Push back up to starting position',
-              'Keep your body in a straight line throughout'
-            ],
-            modifications: [
-              'Easier: Perform on knees or against a wall',
-              'Harder: Elevate feet or add clap push-ups'
-            ]
-          },
-          {
-            name: 'Bodyweight Squats',
-            description: 'Fundamental lower body exercise for legs and glutes',
-            sets: 3,
-            reps: 15,
-            restTime: 60,
-            difficulty: 'medium',
-            equipment: ['bodyweight'],
-            muscleGroups: ['quadriceps', 'glutes', 'hamstrings'],
-            instructions: [
-              'Stand with feet shoulder-width apart',
-              'Lower your body as if sitting back into a chair',
-              'Keep your chest up and knees behind toes',
-              'Return to standing position'
-            ],
-            modifications: [
-              'Easier: Use a chair for support',
-              'Harder: Add jump squats or single-leg squats'
-            ]
-          },
-          {
-            name: 'Plank',
-            description: 'Core strengthening exercise for stability and endurance',
-            sets: 3,
-            duration: 30,
-            restTime: 60,
-            difficulty: 'medium',
-            equipment: ['bodyweight'],
-            muscleGroups: ['core', 'shoulders'],
-            instructions: [
-              'Start in push-up position',
-              'Lower to forearms, keeping body straight',
-              'Hold position, breathing normally',
-              'Keep hips level and core engaged'
-            ],
-            modifications: [
-              'Easier: Perform on knees',
-              'Harder: Add leg lifts or side planks'
-            ]
-          }
-        ],
-        warmup: [
-          {
-            name: 'Light Movement',
-            duration: 5,
-            instructions: 'March in place, arm circles, and gentle stretching'
-          }
-        ],
-        cooldown: [
-          {
-            name: 'Static Stretching',
-            duration: 5,
-            instructions: 'Hold stretches for major muscle groups for 15-30 seconds each'
-          }
-        ],
-        tips: [
-          'Focus on proper form over speed',
-          'Listen to your body and rest when needed',
-          'Stay hydrated throughout the workout'
-        ],
-        safetyNotes: [
-          'Stop if you experience pain or dizziness',
-          'Warm up properly before starting',
-          'Cool down and stretch after completing the workout'
-        ]
-      },
-      personalizedMessage: 'This is a great starting workout! Focus on form and gradually increase intensity as you get stronger.',
-      modelUsed
-    };
-  }
+
 
   async generateWorkout(
     request: WorkoutGenerationRequest,
@@ -1024,8 +918,7 @@ Structure:
       const options: AIRequestOptions = {
         modelType,
         temperature: modelType === AIModelType.KREATIV ? 0.8 : 0.7,
-        maxTokens: 3000,
-        fallbackModels: true
+        maxTokens: 3000
       };
       
       // Create proper OpenRouterRequest
@@ -1037,20 +930,6 @@ Structure:
       };
       
       const response = await this.openRouterService.generateResponse(openRouterRequest, options);
-      
-      // If OpenRouter service returns null (no API key), use fallback immediately
-      if (!response) {
-        console.log('OpenRouter returned null - using fallback workout');
-        const fallbackWorkout = this.createFallbackWorkout('fallback-no-api-key');
-        const safetyAnalysis = {
-          riskLevel: 'low' as const,
-          contraindications: safetyWarnings,
-          modifications: ['Adjust intensity based on comfort level']
-        };
-        const enhancedFallback = this.convertToEnhancedResponse(fallbackWorkout, safetyAnalysis);
-        enhancedFallback.workout.warnings = ['Demo mode - configure OpenRouter API key for AI-generated workouts'];
-        return enhancedFallback;
-      }
       
       // Use enhanced parsing for the new workout structure
       const parsedResponse = this.parseEnhancedWorkoutResponse(response?.choices?.[0]?.message?.content || '', response?.model || 'unknown');
@@ -1076,73 +955,8 @@ Structure:
         throw error as AIError;
       }
       
-      // Otherwise, return enhanced fallback workout
-      const fallbackWorkout = this.createFallbackWorkout('fallback');
-      return {
-        workout: {
-          id: 'fallback-workout-' + Date.now(),
-          title: fallbackWorkout.workout.title,
-          description: fallbackWorkout.workout.description,
-          totalDuration: fallbackWorkout.workout.duration,
-          difficulty: fallbackWorkout.workout.difficulty,
-          mode: 'classic',
-          warmup: {
-            id: 'warmup-block',
-            type: 'warmup',
-            name: 'Warmup',
-            duration: 5,
-            exercises: fallbackWorkout.workout.warmup.map(w => ({
-                name: w.name,
-                description: w.instructions,
-                duration: w.duration,
-                restTime: 0,
-                difficulty: 'easy',
-                equipment: ['bodyweight'],
-                muscleGroups: ['full_body'],
-                instructions: [w.instructions],
-                modifications: []
-              }))
-          },
-          blocks: [{
-            id: 'main-block',
-            type: 'strength',
-            name: 'Main Workout',
-            duration: 20,
-            exercises: fallbackWorkout.workout.exercises
-          }],
-          cooldown: {
-            id: 'cooldown-block',
-            type: 'cooldown',
-            name: 'Cooldown',
-            duration: 5,
-            exercises: fallbackWorkout.workout.cooldown.map(c => ({
-                name: c.name,
-                description: c.instructions,
-                duration: c.duration,
-                restTime: 0,
-                difficulty: 'easy',
-                equipment: ['bodyweight'],
-                muscleGroups: ['full_body'],
-                instructions: [c.instructions],
-                modifications: []
-              }))
-          },
-          tips: fallbackWorkout.workout.tips,
-          safetyNotes: fallbackWorkout.workout.safetyNotes
-        },
-        personalizedMessage: fallbackWorkout.personalizedMessage,
-        modelUsed: fallbackWorkout.modelUsed,
-        rpeGuidance: {
-          targetIntensity: 6,
-          progressionNotes: ['Start conservatively and adjust based on how you feel'],
-          recoveryRecommendations: ['Take rest days between workouts']
-        },
-        safetyAnalysis: {
-          riskLevel: 'low',
-          contraindications: [],
-          modifications: ['Reduce intensity if experiencing any discomfort']
-        }
-      } as EnhancedWorkoutResponse;
+      // Re-throw the error for proper error handling
+      throw error;
     }
   }
 
