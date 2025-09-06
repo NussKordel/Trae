@@ -717,7 +717,16 @@ Structure:
       const jsonMatch = content.match(/\{[\s\S]*\}/);
       const jsonString = jsonMatch ? jsonMatch[0] : content;
       
-      const parsed = JSON.parse(jsonString);
+      let parsed;
+      try {
+        parsed = JSON.parse(jsonString);
+      } catch (jsonError) {
+        // Provide more specific JSON parsing error information
+        const errorMessage = jsonError instanceof Error ? jsonError.message : 'Unknown JSON error';
+        console.error('JSON parsing failed:', errorMessage);
+        console.error('Problematic JSON substring:', jsonString.substring(Math.max(0, this.extractPositionFromError(errorMessage) - 50), this.extractPositionFromError(errorMessage) + 50));
+        throw new Error(`JSON parsing failed at position ${this.extractPositionFromError(errorMessage)}: ${errorMessage}`);
+      }
       
       // Ensure the response has the correct structure
       if (!parsed.workout) {
@@ -767,6 +776,62 @@ Structure:
     }
   }
 
+  private extractAndCleanJson(content: string): string {
+    // Remove markdown code blocks if present
+    let cleaned = content.replace(/```json\s*/g, '').replace(/```\s*/g, '');
+    
+    // Try to find JSON object boundaries
+    const jsonMatch = cleaned.match(/\{[\s\S]*\}/);
+    if (jsonMatch) {
+      cleaned = jsonMatch[0];
+    }
+    
+    // Remove any text before the first { or after the last }
+    const firstBrace = cleaned.indexOf('{');
+    const lastBrace = cleaned.lastIndexOf('}');
+    
+    if (firstBrace !== -1 && lastBrace !== -1 && lastBrace > firstBrace) {
+      cleaned = cleaned.substring(firstBrace, lastBrace + 1);
+    }
+    
+    return cleaned.trim();
+  }
+
+  private aggressiveJsonClean(content: string): string {
+    // More aggressive cleaning for malformed JSON
+    let cleaned = content;
+    
+    // Remove any non-JSON content at the beginning
+    const jsonStart = cleaned.search(/\{/);
+    if (jsonStart > 0) {
+      cleaned = cleaned.substring(jsonStart);
+    }
+    
+    // Find the last complete JSON object
+    let braceCount = 0;
+    let lastValidIndex = -1;
+    
+    for (let i = 0; i < cleaned.length; i++) {
+      if (cleaned[i] === '{') {
+        braceCount++;
+      } else if (cleaned[i] === '}') {
+        braceCount--;
+        if (braceCount === 0) {
+          lastValidIndex = i;
+        }
+      }
+    }
+    
+    if (lastValidIndex > -1) {
+      cleaned = cleaned.substring(0, lastValidIndex + 1);
+    }
+    
+    // Fix common JSON issues
+    cleaned = this.attemptJsonFix(cleaned);
+    
+    return cleaned;
+  }
+
   private attemptJsonFix(jsonString: string): string {
     // Remove any trailing incomplete content after the last complete brace
     let fixed = jsonString.trim();
@@ -799,22 +864,43 @@ Structure:
     fixed = fixed.replace(/,\s*}/g, '}');
     fixed = fixed.replace(/,\s*]/g, ']');
     
+    // Fix common array issues
+    fixed = fixed.replace(/,\s*,/g, ','); // Remove double commas
+    fixed = fixed.replace(/\[\s*,/g, '['); // Remove leading commas in arrays
+    fixed = fixed.replace(/,\s*\]/g, ']'); // Remove trailing commas in arrays
+    
     // Remove any incomplete string literals at the end
     fixed = fixed.replace(/"[^"]*$/g, '""');
     
     return fixed;
   }
 
+  private extractPositionFromError(errorMessage: string): number {
+    // Extract position from JSON error messages like "Expected ',' or ']' after array element in JSON at position 12519"
+    const positionMatch = errorMessage.match(/position (\d+)/);
+    return positionMatch ? parseInt(positionMatch[1], 10) : 0;
+  }
+
   private parseEnhancedWorkoutResponse(content: string, modelUsed: string): EnhancedWorkoutResponse {
     try {
-      // Try to extract JSON from the response
-      let jsonMatch = content.match(/\{[\s\S]*\}/);
-      let jsonString = jsonMatch ? jsonMatch[0] : content;
+      // Clean and extract JSON from the response
+      let jsonString = this.extractAndCleanJson(content);
       
-      // Attempt to fix common JSON truncation issues
+      // Attempt to fix common JSON issues
       jsonString = this.attemptJsonFix(jsonString);
       
-      const parsed = JSON.parse(jsonString);
+      let parsed;
+      try {
+        parsed = JSON.parse(jsonString);
+      } catch (jsonError) {
+        // Provide more specific JSON parsing error information
+        const errorMessage = jsonError instanceof Error ? jsonError.message : 'Unknown JSON error';
+        const position = this.extractPositionFromError(errorMessage);
+        console.error('Enhanced JSON parsing failed:', errorMessage);
+        console.error('Error position:', position);
+        console.error('JSON around error position:', jsonString.substring(Math.max(0, position - 100), position + 100));
+        throw new Error(`Enhanced JSON parsing failed at position ${position}: ${errorMessage}`);
+      }
       
       // Ensure the response has the correct structure
       if (!parsed.workout) {
@@ -888,9 +974,22 @@ Structure:
       return parsed as EnhancedWorkoutResponse;
     } catch (error) {
       console.error('Failed to parse enhanced workout response:', error);
-      console.error('Raw content:', content);
+      console.error('Raw content length:', content.length);
+      console.error('Raw content preview:', content.substring(0, 500) + '...');
       
-      throw new Error(`Failed to parse AI enhanced workout response: ${error instanceof Error ? error.message : 'Unknown error'}`);
+      // Try one more time with aggressive cleaning
+      try {
+        const cleanedContent = this.aggressiveJsonClean(content);
+        const parsed = JSON.parse(cleanedContent);
+        if (parsed.workout) {
+          console.log('Successfully recovered with aggressive cleaning');
+          return this.parseEnhancedWorkoutResponse(cleanedContent, modelUsed);
+        }
+      } catch (secondError) {
+        console.error('Aggressive cleaning also failed:', secondError);
+      }
+      
+      throw new Error(`Failed to parse AI enhanced workout response: ${error instanceof Error ? error.message : 'Unknown error'}. The AI response may be malformed or truncated.`);
     }
   }
 
