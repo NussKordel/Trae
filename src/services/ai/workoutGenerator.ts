@@ -842,6 +842,13 @@ Structure:
     cleaned = cleaned.replace(/]\s*\[/g, '],[');
     // Fix missing commas between object properties
     cleaned = cleaned.replace(/"\s*"([^:]*?)":/g, '","$1":');
+    // Fix missing commas after quoted strings in arrays (common AI mistake)
+    cleaned = cleaned.replace(/"\s*\n\s*"/g, '",\n      "');
+    cleaned = cleaned.replace(/"\s+"/g, '", "');
+    // Fix the specific pattern from the error: quoted string followed by whitespace and another quoted string
+    cleaned = cleaned.replace(/"\s*,?\s*\n\s*"([^"]*)"/g, '",\n       "$1"');
+    // Handle cases where there's no newline but missing comma between quoted strings
+    cleaned = cleaned.replace(/"(\s{2,})"/g, '", "');
     // Fix incomplete strings at the end
     cleaned = cleaned.replace(/"[^"]*$/g, '"');
     
