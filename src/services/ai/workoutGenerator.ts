@@ -849,6 +849,10 @@ Structure:
     cleaned = cleaned.replace(/"\s*,?\s*\n\s*"([^"]*)"/g, '",\n       "$1"');
     // Handle cases where there's no newline but missing comma between quoted strings
     cleaned = cleaned.replace(/"(\s{2,})"/g, '", "');
+    // Fix missing comma before closing bracket after quoted string
+    cleaned = cleaned.replace(/"\s*]/g, '"]');
+    // Fix missing comma before closing bracket with newlines
+    cleaned = cleaned.replace(/"\s*\n\s*]/g, '"\n    ]');
     // Fix incomplete strings at the end
     cleaned = cleaned.replace(/"[^"]*$/g, '"');
     
