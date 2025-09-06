@@ -1,0 +1,100 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  html {
+    font-family: 'Inter', system-ui, sans-serif;
+  }
+  
+  body {
+    @apply bg-gray-50 text-gray-900 transition-colors duration-300;
+    @apply dark:bg-gray-900 dark:text-gray-100;
+  }
+  
+  * {
+    @apply border-gray-200 dark:border-gray-700;
+  }
+  
+  /* Smooth transitions for theme changes */
+  * {
+    transition-property: background-color, border-color, color, fill, stroke;
+    transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
+    transition-duration: 200ms;
+  }
+}
+
+@layer components {
+  /* Large, accessible buttons */
+  .btn-primary {
+    @apply bg-primary-600 hover:bg-primary-700 text-white font-semibold py-4 px-8 rounded-xl transition-all duration-200 focus:outline-none focus:ring-4 focus:ring-primary-500/50 focus:ring-offset-2 shadow-lg hover:shadow-xl;
+    @apply dark:bg-primary-500 dark:hover:bg-primary-600 dark:focus:ring-offset-gray-900;
+    min-height: 48px;
+  }
+  
+  .btn-secondary {
+    @apply bg-gray-200 hover:bg-gray-300 text-gray-900 font-semibold py-4 px-8 rounded-xl transition-all duration-200 focus:outline-none focus:ring-4 focus:ring-gray-500/50 focus:ring-offset-2 shadow-md hover:shadow-lg;
+    @apply dark:bg-gray-700 dark:hover:bg-gray-600 dark:text-gray-100 dark:focus:ring-offset-gray-900;
+    min-height: 48px;
+  }
+  
+  .btn-outline {
+    @apply border-2 border-primary-600 text-primary-600 hover:bg-primary-600 hover:text-white font-semibold py-4 px-8 rounded-xl transition-all duration-200 focus:outline-none focus:ring-4 focus:ring-primary-500/50 focus:ring-offset-2;
+    @apply dark:border-primary-400 dark:text-primary-400 dark:hover:bg-primary-400 dark:hover:text-gray-900 dark:focus:ring-offset-gray-900;
+    min-height: 48px;
+  }
+  
+  /* Cards with dark theme support */
+  .card {
+    @apply bg-white rounded-xl shadow-sm border border-gray-200 p-6 transition-all duration-200;
+    @apply dark:bg-gray-800 dark:border-gray-700 dark:shadow-gray-900/20;
+  }
+  
+  .card-elevated {
+    @apply bg-white rounded-xl shadow-lg border border-gray-200 p-6 hover:shadow-xl transition-all duration-300;
+    @apply dark:bg-gray-800 dark:border-gray-700 dark:shadow-gray-900/40;
+  }
+  
+  /* Form inputs */
+  .input-field {
+    @apply w-full px-4 py-3 border border-gray-300 rounded-xl focus:outline-none focus:ring-4 focus:ring-primary-500/50 focus:border-primary-500 transition-all duration-200 bg-white;
+    @apply dark:bg-gray-800 dark:border-gray-600 dark:text-gray-100 dark:focus:border-primary-400 dark:focus:ring-primary-400/50;
+    min-height: 48px;
+  }
+  
+  /* Workout specific cards */
+  .workout-card {
+    @apply bg-gradient-to-br from-primary-50 to-secondary-50 rounded-xl p-6 border border-primary-200 hover:shadow-lg transition-all duration-300;
+    @apply dark:from-primary-900/20 dark:to-secondary-900/20 dark:border-primary-700;
+  }
+  
+  .exercise-item {
+    @apply flex items-center justify-between p-4 bg-white rounded-lg border border-gray-200 hover:border-primary-300 transition-all duration-200;
+    @apply dark:bg-gray-800 dark:border-gray-700 dark:hover:border-primary-500;
+  }
+  
+  /* Exercise card placeholder */
+  .exercise-card {
+    @apply bg-white rounded-xl shadow-md border border-gray-200 p-6 hover:shadow-lg transition-all duration-300;
+    @apply dark:bg-gray-800 dark:border-gray-700;
+  }
+  
+  .exercise-card-image {
+    @apply w-full h-48 bg-gradient-to-br from-gray-100 to-gray-200 rounded-lg mb-4 flex items-center justify-center;
+    @apply dark:from-gray-700 dark:to-gray-800;
+  }
+}
+
+@layer utilities {
+  .text-balance {
+    text-wrap: balance;
+  }
+  
+  .animate-pulse-slow {
+    animation: pulse 3s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+  }
+  
+  .gradient-text {
+    @apply bg-gradient-to-r from-primary-600 to-secondary-600 bg-clip-text text-transparent;
+  }
+}
